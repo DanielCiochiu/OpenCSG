@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2011, Florian Kirsch,
+// Copyright (C) 2002-2014, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -15,7 +15,7 @@
 //
 // You should have received a copy of the GNU General Public License 
 // along with this program; if not, write to the Free Software Foundation,
-// Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 //
 // renderGoldfeather.cpp
@@ -52,7 +52,7 @@ namespace OpenCSG {
             setupProjectiveTexture();
 
             glEnable(GL_ALPHA_TEST);
-            glAlphaFunc(GL_GEQUAL, 0.5); // accuracy issue with GL_EQUAL 1.0 on FX5600
+            glAlphaFunc(GL_GEQUAL, 0.5f); // accuracy issue with GL_EQUAL 1.0 on FX5600
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_LESS);
             glDepthMask(GL_TRUE);
@@ -105,17 +105,29 @@ namespace OpenCSG {
             glPushMatrix();
             glLoadIdentity();
 
+            GLboolean origVertexArrayState = glIsEnabled(GL_VERTEX_ARRAY);
+            if (!origVertexArrayState) {
+                glEnableClientState(GL_VERTEX_ARRAY);
+            }
+
             for (Batch::const_iterator j = batch.begin(); j != batch.end(); ++j) {
 
                 float fminx, fminy, fminz, fmaxx, fmaxy, fmaxz;
                 (*j)->getBoundingBox(fminx, fminy, fminz, fmaxx, fmaxy, fmaxz);
 
-                glBegin(GL_TRIANGLE_STRIP);
-                    glVertex2f(fminx, fminy);
-                    glVertex2f(fmaxx, fminy);
-                    glVertex2f(fminx, fmaxy);
-                    glVertex2f(fmaxx, fmaxy);
-                glEnd();
+                const GLfloat v[8] = {
+                    fminx, fminy,
+                    fmaxx, fminy,
+                    fminx, fmaxy,
+                    fmaxx, fmaxy
+                };
+
+                glVertexPointer(2, GL_FLOAT, 0, v);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            }
+
+            if (!origVertexArrayState) {
+                glDisableClientState(GL_VERTEX_ARRAY);
             }
 
             glMatrixMode(GL_PROJECTION);

@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2011, Florian Kirsch,
+// Copyright (C) 2002-2014, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -15,7 +15,7 @@
 //
 // You should have received a copy of the GNU General Public License 
 // along with this program; if not, write to the Free Software Foundation,
-// Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 //
 // channelManager.cpp
@@ -55,7 +55,7 @@ namespace OpenCSG {
 
         void defaults() {
             glViewport(OpenGL::canvasPos[0], OpenGL::canvasPos[1], OpenGL::canvasPos[2], OpenGL::canvasPos[3]);
-            glClearColor(0.0, 0.0, 0.0, 0.0);
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
             glClearDepth(1.0);
             glClearStencil(0);
             glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -378,10 +378,10 @@ namespace OpenCSG {
 
 
     void ChannelManager::setupProjectiveTexture() {
-        static float splane[4] = { 1.0, 0.0, 0.0, 0.0 };
-        static float tplane[4] = { 0.0, 1.0, 0.0, 0.0 };
-        static float rplane[4] = { 0.0, 0.0, 1.0, 0.0 };
-        static float qplane[4] = { 0.0, 0.0, 0.0, 1.0 };
+        static float splane[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+        static float tplane[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+        static float rplane[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
+        static float qplane[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
         gOffscreenBuffer->Bind();
         gOffscreenBuffer->EnableTextureTarget();
@@ -423,15 +423,15 @@ namespace OpenCSG {
             factorY /= static_cast<float>(gOffscreenBuffer->GetHeight());
         }
 
-        float   texCorrect[16] = { factorX, 0.0, 0.0, 0.0, 
-                                   0.0, factorY, 0.0, 0.0, 
-                                   0.0,     0.0, 1.0, 0.0,
-                                   0.0,     0.0, 0.0, 1.0 };
+        float   texCorrect[16] = { factorX, 0.0f, 0.0f, 0.0f, 
+                                   0.0f, factorY, 0.0f, 0.0f, 
+                                   0.0f,    0.0f, 1.0f, 0.0f,
+                                   0.0f,    0.0f, 0.0f, 1.0f };
         
-        static float p2ndc[16] = { 0.5, 0.0, 0.0, 0.0, 
-                                   0.0, 0.5, 0.0, 0.0, 
-                                   0.0, 0.0, 0.5, 0.0, 
-                                   0.5, 0.5, 0.5, 1.0 };
+        static float p2ndc[16] = { 0.5f, 0.0f, 0.0f, 0.0f, 
+                                   0.0f, 0.5f, 0.0f, 0.0f, 
+                                   0.0f, 0.0f, 0.5f, 0.0f, 
+                                   0.5f, 0.5f, 0.5f, 1.0f };
         glPushMatrix();
         glLoadMatrixf(texCorrect);
         glMultMatrixf(p2ndc);
@@ -464,13 +464,13 @@ namespace OpenCSG {
             if (GLEW_ARB_texture_env_dot3) {
                 switch (channel) {
                 case Red: 
-                    glColor3f(1.0, 0.5, 0.5); 
+                    glColor3f(1.0f, 0.5f, 0.5f); 
                     break;                
                 case Green: 
-                    glColor3f(0.5, 1.0, 0.5); 
+                    glColor3f(0.5f, 1.0f, 0.5f); 
                     break;
                 case Blue: 
-                    glColor3f(0.5, 0.5, 1.0); 
+                    glColor3f(0.5f, 0.5f, 1.0f); 
                     break;
                 default:
                     // should not happen!
