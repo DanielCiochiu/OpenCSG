@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2011, Florian Kirsch,
+// Copyright (C) 2002-2014, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -15,7 +15,7 @@
 //
 // You should have received a copy of the GNU General Public License 
 // along with this program; if not, write to the Free Software Foundation,
-// Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 //
 // primitive.cpp
@@ -32,12 +32,12 @@ namespace OpenCSG {
     Primitive::Primitive(Operation o, unsigned int c) :
         mOperation(o),
         mConvexity(c),
-        mMinx(-1.0),
-        mMiny(-1.0),
-        mMinz(-1.0),
-        mMaxx(1.0),
-        mMaxy(1.0),
-        mMaxz(1.0) {
+        mMinx(-1.0f),
+        mMiny(-1.0f),
+        mMinz(-1.0f),
+        mMaxx(1.0f),
+        mMaxy(1.0f),
+        mMaxz(1.0f) {
     }
 
     Primitive::~Primitive() { }
