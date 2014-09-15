@@ -1,3 +1,26 @@
+13.09.2014
+    Changed: On Linux and Mac, ignore the OpenCSG-provided GLEW and
+        build link with the system provided GLEW instead.
+
+11.09.2014
+    Fixed: Do not write into the color buffer during primitive visibility
+        transfer. This bug made it impossible to use alpha blending
+        on the final CSG geometry, because the geometry was already
+        shaded by OpenCSG.
+
+21.08.2014
+    Fixed: In the layered Goldfeather algorithms, do not hang forever
+        if the maximum stencil width has been reached, i.e., if the
+        depth complexity is larger than 255
+
+17.08.2014
+    Added: 32-bit Id-buffer for SCS algorithm, which requires the
+        ARB_fragment_program extension. This allows the SCS algorithm
+        to process more than 255 primitives
+
+11.05.2014
+    Release 1.3.3
+
 02.04.2014
     Fixed: Linux XVisualInfo * code path to create a PBuffer context,
         that would always crash.
@@ -10,7 +33,7 @@
 
 02.10.2012
     Fixed: in opencsgexample, fixed glut.h / stdlib.h conflict in declaration
-	    of exit()
+        of exit()
 
 18.01.2012
     Changed: Use vertex arrays instead of glBegin/glEnd for rendering quads

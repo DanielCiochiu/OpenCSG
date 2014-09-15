@@ -39,7 +39,7 @@ namespace OpenCSG {
     class Primitive;
 
     enum Channel {
-        NoChannel = 0, Alpha = 1, Red = 2, Green = 4, Blue = 8
+        NoChannel = 0, Alpha = 1, Red = 2, Green = 4, Blue = 8, AllChannels = 15
     };
 
     class ChannelManager {
@@ -59,7 +59,7 @@ namespace OpenCSG {
         Channel find() const;
         /// allocates a new channel for temporary calculation of visibility
         /// information. return NoChannel if no free channel was found.
-        Channel request();
+        virtual Channel request();
         /// returns the currently used channel for visibility calculation
         Channel current() const;
         /// returns channels that currently contain visibility information
@@ -84,12 +84,16 @@ namespace OpenCSG {
         /// moved into alpha, to allow alpha testing of the channel.
         static void setupTexEnv(Channel channel);
 
-    private:
+    protected:
+        bool isRectangularTexture() const;
 
-        static OpenGL::OffscreenBuffer* gOffscreenBuffer;
+    private:
         static bool gInUse;
 
+        OpenGL::OffscreenBuffer* mOffscreenBuffer;
         bool mInOffscreenBuffer;
+
+    protected:
         Channel mCurrentChannel;
         int mOccupiedChannels;
     };

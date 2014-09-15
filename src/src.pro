@@ -1,10 +1,18 @@
-TEMPLATE	= lib
-TARGET		= opencsg
-VERSION     = 1.3.3
-DESTDIR     = ../lib
+TEMPLATE = lib
+TARGET = opencsg
+VERSION = 1.4.0
 
-CONFIG		+= opengl warn_on release
-INCLUDEPATH += ../include ../glew/include ../
+CONFIG += opengl warn_on release
+INCLUDEPATH += ../include ../
+CONFIG -= qt
+LIBS += -lGLEW
+
+DESTDIR = ../lib
+INSTALLDIR = /usr/local
+headers.files = ../include/opencsg.h
+headers.path = $$INSTALLDIR/include
+target.path = /usr/local/lib
+INSTALLS += target headers
 
 HEADERS		= ../include/opencsg.h \
 		  opencsgConfig.h \
@@ -31,7 +39,6 @@ SOURCES		= area.cpp \
 		  frameBufferObject.cpp	\
 		  frameBufferObjectExt.cpp \
 		  occlusionQuery.cpp \
-		  offscreenBuffer.cpp \
 		  opencsgRender.cpp \
 		  openglHelper.cpp \
 		  pBufferTexture.cpp \

@@ -56,6 +56,7 @@ namespace OpenCSG {
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_LESS);
             glDepthMask(GL_TRUE);
+            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
             std::vector<Channel> channels = occupied();
             for (std::vector<Channel>::const_iterator c = channels.begin(); c!=channels.end(); ++c) {
@@ -400,6 +401,14 @@ namespace OpenCSG {
             scissor->disableScissor();
 
             ++layer;
+
+            // There are more layers than the stencil buffer allows us to
+            // render. Return claiming success (which is cheating, since
+            // we were not really successful)
+            if (layer == OpenGL::stencilMax) {
+                retVal = true;
+                break;
+            }
         }
 
         delete occlusionTest;

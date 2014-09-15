@@ -39,7 +39,7 @@
 #endif
 
 enum { 
-    CSG_BASIC, CSG_WIDGET, CSG_GRID2D, CSG_GRID3D, CSG_CONCAVE,
+    CSG_BASIC, CSG_WIDGET, CSG_GRID2D, CSG_GRID3D, CSG_CUBERACK, CSG_CONCAVE,
 
     ALGO_AUTOMATIC, GF_STANDARD, GF_DC, GF_OQ, SCS_STANDARD, SCS_DC, SCS_OQ,
 
@@ -216,6 +216,43 @@ void setGrid3D() {
     }
 }
 
+void setCubeRack() {
+
+    clearPrimitives();
+
+    GLuint id1 = glGenLists(1);
+    glNewList(id1, GL_COMPILE);
+    glutSolidCube(2.0);
+    glEndList();
+
+    primitives.push_back(new OpenCSG::DisplayListPrimitive(id1, OpenCSG::Intersection, 1));
+
+    // mx*x / my*y / mz*z loop all numbers in [-3, 3] in the following order:
+    // 3, -3, 2, -2, 1, -1, 0. Compared to the trivial ordering, this makes
+    // the CSG rendering less depending on the camera orientation.
+    for (int x=3; x>=0; --x) {
+        for (int y=3; y>=0; --y) {
+            for (int z=3; z>=0; --z) {
+                for (int mx=-1; mx<=1 && mx<=x; mx+=2) {
+                    for (int my=-1; my<=1 && my<=y; my+=2) {
+                        for (int mz=-1; mz<=1 && mz<=z; mz+=2) {
+                            GLuint id = glGenLists(1);
+                            glNewList(id, GL_COMPILE);
+                            glPushMatrix();
+                            glTranslatef(float(x*mx)/6.0f, float(y*my)/6.0f, float(z*mz)/6.0f);
+                            glutSolidSphere(0.58, 20, 20);
+                            glPopMatrix();
+                            glEndList();
+
+                            primitives.push_back(new OpenCSG::DisplayListPrimitive(id, OpenCSG::Subtraction, 1));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void setConcave() {
     
     clearPrimitives();
@@ -347,6 +384,7 @@ void menu(int value) {
     case CSG_WIDGET:     setWidget();        break;
     case CSG_GRID2D:     setGrid2D();        break;
     case CSG_GRID3D:     setGrid3D();        break;
+    case CSG_CUBERACK:   setCubeRack();      break;
     case CSG_CONCAVE:    setConcave();       break;
 
     case ALGO_AUTOMATIC: OpenCSG::setOption(OpenCSG::AlgorithmSetting, OpenCSG::Automatic);
@@ -428,11 +466,12 @@ int main(int argc, char **argv)
     }  
 
     int menuShape     = glutCreateMenu(menu);
-    glutAddMenuEntry("Simple",  CSG_BASIC);
-    glutAddMenuEntry("Widget",  CSG_WIDGET);
-    glutAddMenuEntry("2D-Grid", CSG_GRID2D);
-    glutAddMenuEntry("3D-Grid", CSG_GRID3D);
-    glutAddMenuEntry("Concave", CSG_CONCAVE);
+    glutAddMenuEntry("Simple",   CSG_BASIC);
+    glutAddMenuEntry("Widget",   CSG_WIDGET);
+    glutAddMenuEntry("2D-Grid",  CSG_GRID2D);
+    glutAddMenuEntry("3D-Grid",  CSG_GRID3D);
+    glutAddMenuEntry("Cuberack", CSG_CUBERACK);
+    glutAddMenuEntry("Concave",  CSG_CONCAVE);
     
     int menuAlgorithm = glutCreateMenu(menu);
     glutAddMenuEntry("Automatic", ALGO_AUTOMATIC);

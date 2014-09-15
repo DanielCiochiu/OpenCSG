@@ -28,6 +28,7 @@
 #include "opencsgRender.h"
 #include "batch.h"
 #include "channelManager.h"
+#include "context.h"
 #include "occlusionQuery.h"
 #include "openglHelper.h"
 #include "primitiveHelper.h"
@@ -40,8 +41,18 @@ namespace OpenCSG {
 
         ScissorMemo* scissor;
 
+        struct IdBufferId {
+            GLubyte r;
+            GLubyte g;
+            GLubyte b;
+            GLubyte a;
+            GLubyte* vec() {
+                return &r;
+            }
+        };
+
         struct RenderData {
-            unsigned int stencilID;
+            IdBufferId bufferId;
         };
 
         std::map<Primitive*, RenderData> gRenderInfo;
@@ -50,13 +61,14 @@ namespace OpenCSG {
             RenderData* dta = &(gRenderInfo.find(primitive))->second;
             return dta;
         }
-    
-        class SCSChannelManager : public ChannelManagerForBatches {
+
+        // Stores Ids in the alpha buffer only -> only 255 primitives are possible
+        class SCSChannelManagerAlphaOnly : public ChannelManagerForBatches {
         public:
             virtual void merge();
         };
 
-        void SCSChannelManager::merge() {
+        void SCSChannelManagerAlphaOnly::merge() {
 
             setupProjectiveTexture();
 
@@ -65,6 +77,7 @@ namespace OpenCSG {
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_LESS);
             glDepthMask(GL_TRUE);
+            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
             std::vector<Channel> channels = occupied();
             for (std::vector<Channel>::const_iterator c = channels.begin(); c!=channels.end(); ++c) {
@@ -77,7 +90,7 @@ namespace OpenCSG {
                 for (std::vector<Primitive*>::const_iterator j = primitives.begin(); j != primitives.end(); ++j) {
                     glCullFace((*j)->getOperation() == Intersection ? GL_BACK : GL_FRONT);
                     RenderData* primitiveData = getRenderData(*j);
-                    unsigned char id = primitiveData->stencilID;
+                    GLubyte id = primitiveData->bufferId.a;
 
                     // Here is an interesting bug, which happened on an ATI HD4670, but actually
                     // might happen on every hardware. I am not sure whether it can be solved 
@@ -99,6 +112,8 @@ namespace OpenCSG {
                     // lookup table containing the correct alpha reference values is 
                     // not required. However a bad feeling remains.
 
+                    // The SCSChannelManagerFragmentProgram path implemented below should fix this.
+
                     double alpha = static_cast<double>(id) / 255.0;
                     GLfloat fAlpha = static_cast<float>(alpha);
                     glAlphaFunc(GL_EQUAL, fAlpha);
@@ -118,16 +133,137 @@ namespace OpenCSG {
             clear();
         }
 
-        class IDGenerator {
+        // Stores Ids in the all components of the color buffer
+        // -> in theory, 2^32-1 primitives are possible
+        class SCSChannelManagerFragmentProgram : public ChannelManagerForBatches {
         public:
-            IDGenerator() { currentID = 0; };
-            unsigned int newID() { return ++currentID; };
-
-        private:
-            unsigned int currentID;
+            virtual Channel request();
+            virtual void merge();
         };
 
-        SCSChannelManager* channelMgr;
+        Channel SCSChannelManagerFragmentProgram::request() {
+            ChannelManagerForBatches::request();
+            mCurrentChannel = AllChannels;
+            mOccupiedChannels = mCurrentChannel;
+            return mCurrentChannel;
+        }
+
+        // Subtract color from texture value, takes the absolute value
+        // and adds all components into each channel of the result, scaled by 2.0f.
+        // This way, all 32-bits of the color channel can be used
+        // for an 'equal' alpha test, i.e, to check if value in texture
+        // and color are equal.
+
+        // Note that 1.0f/255.0f cannot be the result of the above computation.
+        // Either the result is 0 (if all components were equal, disregarding
+        // numerical errors), or larger/equal than 2.0f/255.0f. The alpha function
+        // then is actually set to  GL_LESS, 1.0f/255.0f. This is robust,
+        // in contract to the GL_EQUAL in SCSChannelManagerAlphaOnly above.
+        // The scaling by 2.0f is required for NVidia hardware, which considers
+        // the alpha function GL_LESS, 0.5f/255.0f as GL_LESS, 0.0f for some reason.
+        static const char mergeFragmentProgramRect[] =
+"!!ARBfp1.0\n"
+"TEMP temp;\n"
+"ATTRIB tex0 = fragment.texcoord[0];\n"
+"ATTRIB col0 = fragment.color;\n"
+"PARAM scaleByTwo = { 2.0, 2.0, 2.0, 2.0 };\n"
+"OUTPUT out = result.color;\n"
+"TXP temp, tex0, texture[0], RECT;\n"
+"SUB temp, temp, col0;\n"
+"ABS temp, temp;\n"
+"DP4 out, temp, scaleByTwo;\n"
+"END";
+
+        static const char mergeFragmentProgram2D[] =
+"!!ARBfp1.0\n"
+"TEMP temp;\n"
+"ATTRIB tex0 = fragment.texcoord[0];\n"
+"ATTRIB col0 = fragment.color;\n"
+"PARAM scaleByTwo = { 2.0, 2.0, 2.0, 2.0 };\n"
+"OUTPUT out = result.color;\n"
+"TXP temp, tex0, texture[0], 2D;\n"
+"SUB temp, temp, col0;\n"
+"ABS temp, temp;\n"
+"DP4 out, temp, scaleByTwo;\n"
+"END";
+        void SCSChannelManagerFragmentProgram::merge()
+        {
+            GLuint id =
+                 isRectangularTexture()
+                   ? OpenGL::getARBFragmentProgram(mergeFragmentProgramRect, (sizeof(mergeFragmentProgramRect) / sizeof(mergeFragmentProgramRect[0])) - 1)
+                   : OpenGL::getARBFragmentProgram(mergeFragmentProgram2D, (sizeof(mergeFragmentProgram2D) / sizeof(mergeFragmentProgram2D[0])) - 1);
+            glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, id);
+            glEnable(GL_FRAGMENT_PROGRAM_ARB);
+
+            setupProjectiveTexture();
+
+            glEnable(GL_ALPHA_TEST);
+            glEnable(GL_CULL_FACE);
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LESS);
+            glDepthMask(GL_TRUE);
+            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+            glAlphaFunc(GL_LESS, 1.0f / 255.0f);
+
+            std::vector<Channel> channels;
+            channels.push_back(AllChannels);
+            for (std::vector<Channel>::const_iterator c = channels.begin(); c!=channels.end(); ++c) {
+
+                scissor->recall(*c);
+                scissor->enableScissor();
+
+                const std::vector<Primitive*> primitives = getPrimitives(*c);
+                for (std::vector<Primitive*>::const_iterator j = primitives.begin(); j != primitives.end(); ++j) {
+                    glCullFace((*j)->getOperation() == Intersection ? GL_BACK : GL_FRONT);
+                    RenderData* primitiveData = getRenderData(*j);
+                    GLubyte * id = primitiveData->bufferId.vec();
+                    glColor4ubv(id);
+                    (*j)->render();
+                }
+            }
+
+            scissor->disableScissor();
+
+            glDisable(GL_FRAGMENT_PROGRAM_ARB);
+            glDisable(GL_ALPHA_TEST);
+            glDisable(GL_CULL_FACE);
+            glDepthFunc(GL_LEQUAL);
+
+            resetProjectiveTexture();
+
+            clear();
+        }
+
+
+        ChannelManagerForBatches* getChannelManager() {
+
+            if (GLEW_ARB_fragment_program) {
+                return new SCSChannelManagerFragmentProgram;
+            }
+
+            return new SCSChannelManagerAlphaOnly;
+        }
+
+
+        class IDGenerator {
+        public:
+            IDGenerator() : counter(0) {};
+            IdBufferId newID() {
+                ++counter;
+                IdBufferId newId;
+                newId.r =  (counter >> 24) & 0xff;
+                newId.g =  (counter >> 16) & 0xff;
+                newId.b =  (counter >>  8) & 0xff;
+                newId.a =  (counter >>  0) & 0xff;
+                return newId;
+            };
+
+        private:
+            unsigned int counter;
+        };
+
+        ChannelManagerForBatches* channelMgr;
 
         void renderIntersectedFront(const std::vector<Primitive*>& primitives) {
 
@@ -142,7 +278,8 @@ namespace OpenCSG {
                 glCullFace(GL_BACK);
                 glEnable(GL_CULL_FACE);
                 RenderData* primitiveData = getRenderData(primitives[0]);
-                GLubyte b = primitiveData->stencilID; glColor4ub(b, b, b, b);
+                GLubyte * id = primitiveData->bufferId.vec();
+                glColor4ubv(id);
                 primitives[0]->render();
                 glDisable(GL_CULL_FACE);
                 glDepthFunc(GL_LESS);
@@ -160,7 +297,8 @@ namespace OpenCSG {
             {
                 for (std::vector<Primitive*>::const_iterator i = primitives.begin(); i != primitives.end(); ++i) {
                     RenderData* primitiveData = getRenderData(*i);
-                    GLubyte b = primitiveData->stencilID; glColor4ub(b, b, b, b);
+                    GLubyte * id = primitiveData->bufferId.vec();
+                    glColor4ubv(id);
                     (*i)->render();
                 }
             }
@@ -209,7 +347,7 @@ namespace OpenCSG {
             glEnable(GL_STENCIL_TEST);
             glEnable(GL_CULL_FACE);
 
-            int stencilref = 0;
+            unsigned int stencilref = 0;
             int sense = 1;
             unsigned int changes = 0;
             std::vector<Batch>::const_iterator i = begin;
@@ -242,10 +380,11 @@ namespace OpenCSG {
                 glStencilFunc(GL_EQUAL, stencilref, OpenGL::stencilMask);
                 glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO);
 
-                { 
-                    for (Batch::const_iterator j = i->begin(); j != i->end(); ++j) {            
+                {
+                    for (Batch::const_iterator j = i->begin(); j != i->end(); ++j) {
                         RenderData* primitiveData = getRenderData(*j);
-                        GLubyte b = primitiveData->stencilID; glColor4ub(b, b, b, b);
+                        GLubyte * id = primitiveData->bufferId.vec();
+                        glColor4ubv(id);
                         (*j)->render();
                     }
                 }
@@ -291,7 +430,7 @@ namespace OpenCSG {
 
             std::vector<unsigned int> fragmentcount(numberOfBatches, 0);
 
-            int stencilref = 0;
+            unsigned int stencilref = 0;
             std::vector<Batch>::const_iterator i = begin;
             unsigned int shapesWithoutUpdate = 0;    
             unsigned int shapeCount = 0;
@@ -329,10 +468,11 @@ namespace OpenCSG {
                 glStencilFunc(GL_EQUAL, stencilref, OpenGL::stencilMask);
                 glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO);
 
-                { 
-                    for (Batch::const_iterator j = i->begin(); j != i->end(); ++j) {            
+                {
+                    for (Batch::const_iterator j = i->begin(); j != i->end(); ++j) {
                         RenderData* primitiveData = getRenderData(*j);
-                        GLubyte b = primitiveData->stencilID; glColor4ub(b, b, b, b);
+                        GLubyte * id = primitiveData->bufferId.vec();
+                        glColor4ubv(id);
                         (*j)->render();
                     }
                 }
@@ -384,7 +524,7 @@ namespace OpenCSG {
 
     void renderSCS(const std::vector<Primitive*>& primitives, DepthComplexityAlgorithm algorithm) {
 
-        channelMgr = new SCSChannelManager;
+        channelMgr = getChannelManager();
         if (!channelMgr->init())
         {
             delete channelMgr;
@@ -403,7 +543,7 @@ namespace OpenCSG {
             for (std::vector<Primitive*>::const_iterator itr = primitives.begin(); itr != primitives.end(); ++itr) {
                 {
                     RenderData dta; 
-                    dta.stencilID = IDMaker.newID();
+                    dta.bufferId = IDMaker.newID();
                     gRenderInfo.insert(std::make_pair(*itr, dta));
                 }
                 Operation operation= (*itr)->getOperation();
@@ -411,7 +551,7 @@ namespace OpenCSG {
                     intersected.push_back(*itr);
                 } else if (operation == Subtraction) {
                     subtracted.push_back(*itr);
-                }   
+                }
             }
         }
 
@@ -431,7 +571,7 @@ namespace OpenCSG {
 
         channelMgr->request();
         channelMgr->renderToChannel(true);
-        
+
         scissor->enableScissor();
         scissor->store(channelMgr->current());
 
