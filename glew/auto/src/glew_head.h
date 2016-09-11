@@ -2,7 +2,7 @@
 #define __glew_h__
 #define __GLEW_H__
 
-#if defined(__gl_h_) || defined(__GL_H__) || defined(__X_GL_H)
+#if defined(__gl_h_) || defined(__GL_H__) || defined(_GL_H) || defined(__X_GL_H)
 #error gl.h included before glew.h
 #endif
 #if defined(__gl2_h_)
@@ -24,6 +24,7 @@
 #define __gl_h_
 #define __gl2_h_
 #define __GL_H__
+#define _GL_H
 #define __gltypes_h_
 #define __REGAL_H__
 #define __X_GL_H
@@ -182,6 +183,9 @@ typedef _W64 int ptrdiff_t;
 #ifndef GLEWAPIENTRY
 #define GLEWAPIENTRY
 #endif
+
+#define GLEW_VAR_EXPORT GLEWAPI
+#define GLEW_FUN_EXPORT GLEWAPI
 
 #ifdef __cplusplus
 extern "C" {

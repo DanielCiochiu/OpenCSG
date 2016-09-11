@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2006-2014, Florian Kirsch
+// Copyright (C) 2006-2016, Florian Kirsch
 //
 // This library is free software; you can redistribute it and/or 
 // modify it under the terms of the GNU General Public License, 
@@ -46,6 +46,11 @@ namespace OpenCSG {
         /// and returns a concrete offscreen buffer, for the currently
         /// active context in OpenCSG.
         OffscreenBuffer* getOffscreenBuffer(OffscreenType type);
+
+        /// Given a constant(!) ARB vertex program string and its length,
+        /// returns a ARB vertex program object, for the currently
+        /// active context in OpenCSG.
+        GLuint getARBVertexProgram(const char* prog, int len);
 
         /// Given a constant(!) ARB fragment program string and its length,
         /// returns a ARB fragment program object, for the currently

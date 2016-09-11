@@ -1,17 +1,20 @@
 TEMPLATE = lib
 TARGET = opencsg
-VERSION = 1.4.0
+VERSION = 1.4.1
+
+isEmpty(INSTALLDIR) {
+  INSTALLDIR = /usr/local
+}
 
 CONFIG += opengl warn_on release
-INCLUDEPATH += ../include ../
+INCLUDEPATH += ../include ../ $$INSTALLDIR/include
 CONFIG -= qt
-LIBS += -lGLEW
+LIBS += -L$$INSTALLDIR/lib -lGLEW
 
 DESTDIR = ../lib
-INSTALLDIR = /usr/local
 headers.files = ../include/opencsg.h
 headers.path = $$INSTALLDIR/include
-target.path = /usr/local/lib
+target.path = $$INSTALLDIR/lib
 INSTALLS += target headers
 
 HEADERS		= ../include/opencsg.h \

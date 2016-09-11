@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2014, Florian Kirsch,
+// Copyright (C) 2002-2016, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -77,9 +77,9 @@ namespace OpenCSG {
         /// setups texture stuff that makes the size of the offscreen buffer
         /// and the size of the main canvas correspond. activates texture
         /// containing the content of the offscreen buffer
-        void setupProjectiveTexture();
+        void setupProjectiveTexture(bool fixedFunction);
         /// undoes texture settings
-        void resetProjectiveTexture();
+        void resetProjectiveTexture(bool fixedFunction);
         /// activate texenv settings such that information in channel is
         /// moved into alpha, to allow alpha testing of the channel.
         static void setupTexEnv(Channel channel);

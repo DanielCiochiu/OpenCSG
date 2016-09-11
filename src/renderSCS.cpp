@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2014, Florian Kirsch,
+// Copyright (C) 2002-2016, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -33,6 +33,8 @@
 #include "openglHelper.h"
 #include "primitiveHelper.h"
 #include "scissorMemo.h"
+
+#include <algorithm>
 #include <map>
 
 namespace OpenCSG {
@@ -70,7 +72,8 @@ namespace OpenCSG {
 
         void SCSChannelManagerAlphaOnly::merge() {
 
-            setupProjectiveTexture();
+            bool isFixedFunction = true;
+            setupProjectiveTexture(isFixedFunction);
 
             glEnable(GL_ALPHA_TEST);
             glEnable(GL_CULL_FACE);
@@ -128,7 +131,7 @@ namespace OpenCSG {
             glDisable(GL_CULL_FACE);
             glDepthFunc(GL_LEQUAL);
 
-            resetProjectiveTexture();
+            resetProjectiveTexture(isFixedFunction);
 
             clear();
         }
@@ -148,6 +151,29 @@ namespace OpenCSG {
             return mCurrentChannel;
         }
 
+        // Emulates eye texgen
+        static const char mergeVertexProgram[] =
+"!!ARBvp1.0 OPTION ARB_position_invariant;\n"
+"ATTRIB  pos = vertex.position;\n"
+"ATTRIB  col = vertex.color;\n"
+"OUTPUT  outCol = result.color;\n"
+"OUTPUT  outTex0 = result.texcoord[0];\n"
+"PARAM   mvpmat[4] = { state.matrix.mvp };\n"
+"PARAM   texmat[4] = { state.matrix.texture[0] };\n"
+"TEMP    eye;\n"
+"TEMP    tex;\n"
+"DP4     eye.x, mvpmat[0], pos;\n"
+"DP4     eye.y, mvpmat[1], pos;\n"
+"DP4     eye.z, mvpmat[2], pos;\n"
+"DP4     eye.w, mvpmat[3], pos;\n"
+"DP4     tex.x, texmat[0], eye;\n"
+"DP4     tex.y, texmat[1], eye;\n"
+"DP4     tex.z, texmat[2], eye;\n"
+"DP4     tex.w, texmat[3], eye;\n"
+"MOV     outTex0, tex;\n"
+"MOV     outCol, col;\n"
+"END";
+
         // Subtract color from texture value, takes the absolute value
         // and adds all components into each channel of the result, scaled by 2.0f.
         // This way, all 32-bits of the color channel can be used
@@ -163,39 +189,45 @@ namespace OpenCSG {
         // the alpha function GL_LESS, 0.5f/255.0f as GL_LESS, 0.0f for some reason.
         static const char mergeFragmentProgramRect[] =
 "!!ARBfp1.0\n"
-"TEMP temp;\n"
-"ATTRIB tex0 = fragment.texcoord[0];\n"
-"ATTRIB col0 = fragment.color;\n"
-"PARAM scaleByTwo = { 2.0, 2.0, 2.0, 2.0 };\n"
-"OUTPUT out = result.color;\n"
-"TXP temp, tex0, texture[0], RECT;\n"
-"SUB temp, temp, col0;\n"
-"ABS temp, temp;\n"
-"DP4 out, temp, scaleByTwo;\n"
+"TEMP    temp;\n"
+"ATTRIB  tex0 = fragment.texcoord[0];\n"
+"ATTRIB  col0 = fragment.color;\n"
+"PARAM   scaleByTwo = { 2.0, 2.0, 2.0, 2.0 };\n"
+"OUTPUT  out = result.color;\n"
+"TXP     temp, tex0, texture[0], RECT;\n"
+"SUB     temp, temp, col0;\n"
+"ABS     temp, temp;\n"
+"DP4     out, temp, scaleByTwo;\n"
 "END";
 
         static const char mergeFragmentProgram2D[] =
 "!!ARBfp1.0\n"
-"TEMP temp;\n"
-"ATTRIB tex0 = fragment.texcoord[0];\n"
-"ATTRIB col0 = fragment.color;\n"
-"PARAM scaleByTwo = { 2.0, 2.0, 2.0, 2.0 };\n"
-"OUTPUT out = result.color;\n"
-"TXP temp, tex0, texture[0], 2D;\n"
-"SUB temp, temp, col0;\n"
-"ABS temp, temp;\n"
-"DP4 out, temp, scaleByTwo;\n"
+"TEMP    temp;\n"
+"ATTRIB  tex0 = fragment.texcoord[0];\n"
+"ATTRIB  col0 = fragment.color;\n"
+"PARAM   scaleByTwo = { 2.0, 2.0, 2.0, 2.0 };\n"
+"OUTPUT  out = result.color;\n"
+"TXP     temp, tex0, texture[0], 2D;\n"
+"SUB     temp, temp, col0;\n"
+"ABS     temp, temp;\n"
+"DP4     out, temp, scaleByTwo;\n"
 "END";
+
         void SCSChannelManagerFragmentProgram::merge()
         {
-            GLuint id =
+            GLuint vId = OpenGL::getARBVertexProgram(mergeVertexProgram, (sizeof(mergeVertexProgram) / sizeof(mergeVertexProgram[0])) - 1);
+            glBindProgramARB(GL_VERTEX_PROGRAM_ARB, vId);
+            glEnable(GL_VERTEX_PROGRAM_ARB);
+
+            GLuint fId =
                  isRectangularTexture()
                    ? OpenGL::getARBFragmentProgram(mergeFragmentProgramRect, (sizeof(mergeFragmentProgramRect) / sizeof(mergeFragmentProgramRect[0])) - 1)
                    : OpenGL::getARBFragmentProgram(mergeFragmentProgram2D, (sizeof(mergeFragmentProgram2D) / sizeof(mergeFragmentProgram2D[0])) - 1);
-            glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, id);
+            glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, fId);
             glEnable(GL_FRAGMENT_PROGRAM_ARB);
 
-            setupProjectiveTexture();
+            bool isFixedFunction = false;
+            setupProjectiveTexture(isFixedFunction);
 
             glEnable(GL_ALPHA_TEST);
             glEnable(GL_CULL_FACE);
@@ -225,12 +257,13 @@ namespace OpenCSG {
 
             scissor->disableScissor();
 
-            glDisable(GL_FRAGMENT_PROGRAM_ARB);
             glDisable(GL_ALPHA_TEST);
             glDisable(GL_CULL_FACE);
             glDepthFunc(GL_LEQUAL);
+            glDisable(GL_FRAGMENT_PROGRAM_ARB);
+            glDisable(GL_VERTEX_PROGRAM_ARB);
 
-            resetProjectiveTexture();
+            resetProjectiveTexture(isFixedFunction);
 
             clear();
         }
@@ -238,7 +271,7 @@ namespace OpenCSG {
 
         ChannelManagerForBatches* getChannelManager() {
 
-            if (GLEW_ARB_fragment_program) {
+            if (GLEW_ARB_vertex_program && GLEW_ARB_fragment_program) {
                 return new SCSChannelManagerFragmentProgram;
             }
 

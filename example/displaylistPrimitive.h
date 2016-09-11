@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2014, Florian Kirsch,
+// Copyright (C) 2002-2016, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -22,6 +22,9 @@
 //
 // example for a primitive which renders itself using a display list
 //
+
+#ifndef __OpenCSG__displaylistprimitive_h__
+#define __OpenCSG__displaylistprimitive_h__
 
 #include <opencsg.h>
 
@@ -49,3 +52,4 @@ namespace OpenCSG {
 
 } // namespace OpenCSG
 
+#endif

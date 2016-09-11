@@ -1,5 +1,5 @@
 // OpenCSG - library for image-based CSG rendering for OpenGL
-// Copyright (C) 2002-2014, Florian Kirsch,
+// Copyright (C) 2002-2016, Florian Kirsch,
 // Hasso-Plattner-Institute at the University of Potsdam, Germany
 //
 // This library is free software; you can redistribute it and/or 
@@ -380,27 +380,31 @@ namespace OpenCSG {
     }
 
 
-    void ChannelManager::setupProjectiveTexture() {
-        static float splane[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
-        static float tplane[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
-        static float rplane[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
-        static float qplane[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    void ChannelManager::setupProjectiveTexture(bool fixedFunction)
+    {
+        static const float splane[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+        static const float tplane[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+        static const float rplane[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
+        static const float qplane[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
         mOffscreenBuffer->Bind();
         mOffscreenBuffer->EnableTextureTarget();
 
-        glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-        glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-        glTexGeni(GL_R, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-        glTexGeni(GL_Q, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-        glTexGenfv(GL_S, GL_EYE_PLANE, splane);
-        glTexGenfv(GL_T, GL_EYE_PLANE, tplane);
-        glTexGenfv(GL_R, GL_EYE_PLANE, rplane);
-        glTexGenfv(GL_Q, GL_EYE_PLANE, qplane);
-        glEnable(GL_TEXTURE_GEN_S);
-        glEnable(GL_TEXTURE_GEN_T);
-        glEnable(GL_TEXTURE_GEN_R);
-        glEnable(GL_TEXTURE_GEN_Q);
+        if (fixedFunction)
+        {
+            glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
+            glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
+            glTexGeni(GL_R, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
+            glTexGeni(GL_Q, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
+            glTexGenfv(GL_S, GL_EYE_PLANE, splane);
+            glTexGenfv(GL_T, GL_EYE_PLANE, tplane);
+            glTexGenfv(GL_R, GL_EYE_PLANE, rplane);
+            glTexGenfv(GL_Q, GL_EYE_PLANE, qplane);
+            glEnable(GL_TEXTURE_GEN_S);
+            glEnable(GL_TEXTURE_GEN_T);
+            glEnable(GL_TEXTURE_GEN_R);
+            glEnable(GL_TEXTURE_GEN_Q);
+        }
 
         glMatrixMode(GL_TEXTURE);
 
@@ -426,25 +430,30 @@ namespace OpenCSG {
             factorY /= static_cast<float>(mOffscreenBuffer->GetHeight());
         }
 
-        float   texCorrect[16] = { factorX, 0.0f, 0.0f, 0.0f, 
-                                   0.0f, factorY, 0.0f, 0.0f, 
+        float   texCorrect[16] = { factorX, 0.0f, 0.0f, 0.0f,
+                                   0.0f, factorY, 0.0f, 0.0f,
                                    0.0f,    0.0f, 1.0f, 0.0f,
                                    0.0f,    0.0f, 0.0f, 1.0f };
-        
-        static float p2ndc[16] = { 0.5f, 0.0f, 0.0f, 0.0f, 
-                                   0.0f, 0.5f, 0.0f, 0.0f, 
-                                   0.0f, 0.0f, 0.5f, 0.0f, 
-                                   0.5f, 0.5f, 0.5f, 1.0f };
+
+        static const float p2ndc[16] = { 0.5f, 0.0f, 0.0f, 0.0f,
+                                         0.0f, 0.5f, 0.0f, 0.0f,
+                                         0.0f, 0.0f, 0.5f, 0.0f,
+                                         0.5f, 0.5f, 0.5f, 1.0f };
         glPushMatrix();
         glLoadMatrixf(texCorrect);
         glMultMatrixf(p2ndc);
-        glMultMatrixf(OpenGL::projection);
-        glMultMatrixf(OpenGL::modelview);
+        if (fixedFunction)
+        {
+            glMultMatrixf(OpenGL::projection);
+            glMultMatrixf(OpenGL::modelview);
+        }
         glMatrixMode(GL_MODELVIEW);
     }
 
-    void ChannelManager::resetProjectiveTexture() {
-        if (!mOffscreenBuffer->haveSeparateContext()) {
+    void ChannelManager::resetProjectiveTexture(bool fixedFunction)
+    {
+        if (fixedFunction && !mOffscreenBuffer->haveSeparateContext())
+        {
             glDisable(GL_TEXTURE_GEN_S);
             glDisable(GL_TEXTURE_GEN_T);
             glDisable(GL_TEXTURE_GEN_R);
