@@ -27,6 +27,7 @@
 #define __OpenCSG__channel_manager_h__
 
 #include "opencsgConfig.h"
+#include <GL/glew.h>
 #include <utility>
 #include <vector>
 
@@ -88,10 +89,14 @@ namespace OpenCSG {
         bool isRectangularTexture() const;
 
     private:
+        ChannelManager(const ChannelManager&);
+        ChannelManager& operator=(const ChannelManager&);
+
         static bool gInUse;
 
         OpenGL::OffscreenBuffer* mOffscreenBuffer;
         bool mInOffscreenBuffer;
+        GLenum mFaceOrientation;
 
     protected:
         Channel mCurrentChannel;

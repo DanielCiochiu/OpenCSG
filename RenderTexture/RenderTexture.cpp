@@ -46,6 +46,10 @@
 #if _MSC_VER < 1300 // MSVC++ <= 6.0
 #pragma warning(disable:4786)
 #endif
+
+// [Florian] to avoid warning C4996: on '_vsnprintf'
+#define _CRT_SECURE_NO_WARNINGS
+// [/Florian]
 #endif
 
 #include "RenderTexture.h"
@@ -194,19 +198,21 @@ void _wglGetLastError()
         // no error
         break;
     default:
-        LPVOID lpMsgBuf;
-        FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-            FORMAT_MESSAGE_FROM_SYSTEM | 
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            err,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-            (LPTSTR) &lpMsgBuf,
-            0,
-            NULL);
-        
-        fprintf(stderr, "RenderTexture Win32 Error %d: %s\n", err, lpMsgBuf);
-        LocalFree( lpMsgBuf );
+        // [Florian] changed lpMsgBuf type from LPVOID to avoid warning in fprintf
+        LPTSTR lpMsgBuf = 0;
+        if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                NULL,
+                err,
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+                (LPTSTR) &lpMsgBuf,
+                0,
+                NULL
+           ) && lpMsgBuf != 0)
+        {
+            fprintf(stderr, "RenderTexture Win32 Error %d: %s\n", err, lpMsgBuf);
+            LocalFree(lpMsgBuf);
+        }
+        // [/Florian]
         break;
     }
     SetLastError(0);
@@ -1007,6 +1013,37 @@ bool RenderTexture::_BindDepthBuffer() const
     return true;
 }
 
+// [Florian]
+namespace
+{
+    vector<string> split(string input, string delimiter)
+    {
+        vector<string> stringList;
+        size_t from = 0;
+        size_t to = 0;
+
+        do
+        {
+            from = input.find_first_not_of(delimiter, to);
+
+            if (from != string::npos)
+            {
+                to = input.find_first_of(delimiter, from);
+
+                size_t numChars = string::npos;
+                if (to != string::npos)
+                    numChars = to - from;
+
+                stringList.push_back(input.substr(from, numChars));
+            }
+        }
+        while (from != string::npos && to != string::npos);
+
+        return stringList;
+    }
+}
+// [/Florian]
+
 //---------------------------------------------------------------------------
 // Function     	: RenderTexture::_ParseModeString
 // Description	    : 
@@ -1034,23 +1071,10 @@ void RenderTexture::_ParseModeString(const char *modeString,
     bool bBind2D   = false;
     bool bBindRECT = false;
     bool bBindCUBE = false;
-    
-    char *mode = strdup(modeString);
 
-    vector<string> tokens;
-    char *buf = strtok(mode, " ");
-    while (buf != NULL)
-    {
-        tokens.push_back(buf);
-        buf = strtok(NULL, " ");
-    }
-
-#ifndef _MSC_VER
-    // in debug mode, microsoft visual studio (6.0, 7.1 works apparently)
-    // assert that the heap is corrupt when this free is done. To be safe, 
-    // just don't do it with these compilers (memory leak is negligable here)
-    free(mode);
-#endif
+    // [Florian] instead of the strtok implementation that caused warnings in VC
+    vector<string> tokens = split(modeString, " ");
+    // [/Florian]
 
     for (unsigned int i = 0; i < tokens.size(); i++)
     {

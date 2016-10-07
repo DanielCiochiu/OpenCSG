@@ -35,7 +35,7 @@ namespace OpenCSG {
 
     namespace OpenGL {
 
-        PBufferTexture::PBufferTexture() {
+        PBufferTexture::PBufferTexture() : r(0), s(0) {
             if (GLEW_ARB_texture_rectangle || GLEW_EXT_texture_rectangle || GLEW_NV_texture_rectangle) {
 #ifdef _WIN32
                 if (WGLEW_ARB_render_texture && (WGLEW_ATI_render_texture_rectangle || WGLEW_NV_render_texture_rectangle)) {
@@ -61,6 +61,10 @@ namespace OpenCSG {
 
         PBufferTexture::~PBufferTexture() {
             delete r;
+        }
+
+        bool PBufferTexture::ReadCurrent() {
+            return true;
         }
 
         bool PBufferTexture::Initialize(int width, int height, bool shareObjects, bool copyContext) {

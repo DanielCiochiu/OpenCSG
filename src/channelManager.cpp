@@ -22,6 +22,8 @@
 //
 
 #include "opencsgConfig.h"
+#include "channelManager.h"
+
 #include <GL/glew.h>
 #ifdef _WIN32
 #include <GL/wglew.h>
@@ -29,7 +31,6 @@
 #include <GL/glxew.h>
 #endif
 
-#include "channelManager.h"
 #include "context.h"
 #include "offscreenBuffer.h"
 #include "openglHelper.h"
@@ -41,8 +42,6 @@ namespace OpenCSG {
     bool ChannelManager::gInUse = false;
 
     namespace {
-
-        GLint FaceOrientation = GL_CCW;
 
         int nextPow2(int value) {
             if(value <= 0) { return 0; }
@@ -71,7 +70,7 @@ namespace OpenCSG {
             int mSecondMax;
             int mCounter;
         public:
-            MaximumMemorizer() : mMax(0), mSecondMax(-1) { }
+            MaximumMemorizer() : mMax(0), mSecondMax(-1), mCounter(0) { }
             void newValue(int v) {
                 if (v>=mMax) {
                     mMax = v;
@@ -97,6 +96,10 @@ namespace OpenCSG {
 
     ChannelManager::ChannelManager()
       : mOffscreenBuffer(0)
+      , mInOffscreenBuffer(false)
+      , mFaceOrientation(GL_CCW)
+      , mCurrentChannel(NoChannel)
+      , mOccupiedChannels(NoChannel)
     {
         glPushAttrib(GL_ALL_ATTRIB_BITS);
         glDisable(GL_LIGHTING);
@@ -105,11 +108,13 @@ namespace OpenCSG {
         if (GLEW_ARB_texture_rectangle || GLEW_EXT_texture_rectangle || GLEW_NV_texture_rectangle)
             glDisable(GL_TEXTURE_RECTANGLE_ARB);
         glDisable(GL_TEXTURE_3D); // OpenGL 1.2 - take this as given
-        if (GL_ARB_texture_cube_map)
+        if (GLEW_ARB_texture_cube_map)
             glDisable(GL_TEXTURE_CUBE_MAP_ARB);
         glDisable(GL_BLEND);
 
-        glGetIntegerv(GL_FRONT_FACE, &FaceOrientation);
+        GLint faceOrientation;
+        glGetIntegerv(GL_FRONT_FACE, &faceOrientation);
+        mFaceOrientation = static_cast<GLenum>(faceOrientation);
 
         glGetFloatv(GL_MODELVIEW_MATRIX, OpenGL::modelview);
         glGetFloatv(GL_PROJECTION_MATRIX, OpenGL::projection);
@@ -172,9 +177,15 @@ namespace OpenCSG {
 
         mOffscreenBuffer = OpenGL::getOffscreenBuffer(newOffscreenType);
 
-        if (!mOffscreenBuffer) {
+        if (!mOffscreenBuffer)
+        {
             // Creating the offscreen buffer failed, maybe the OpenGL extension
             // for the specific offscreen buffer type is not supported
+            return false;
+        }
+
+        if (!mOffscreenBuffer->ReadCurrent())
+        {
             return false;
         }
 
@@ -221,7 +232,8 @@ namespace OpenCSG {
 
         bool rebuild = false;
 
-        if (!mOffscreenBuffer->IsInitialized()) {
+        if (!mOffscreenBuffer->IsInitialized())
+        {
             if (!mOffscreenBuffer->Initialize(sizeX.getMax(), sizeY.getMax(), true, false)) {
                 // Initializing the offscreen buffer failed, maybe the OpenGL extension
                 // for the specific offscreen buffer type is not supported
@@ -230,18 +242,18 @@ namespace OpenCSG {
             rebuild = true;
         }
         // tx == ty == 0 happens if the window is minimized, in this case don't touch a thing
-        else if (tx != 0 && ty != 0) {
-            if (   mOffscreenBuffer->GetWidth() != sizeX.getMax()
-                || mOffscreenBuffer->GetHeight() != sizeY.getMax()
-            ) {
-                if (!mOffscreenBuffer->Resize(sizeX.getMax(), sizeY.getMax())) {
-                    // Resizing the offscreen buffer failed, maybe the OpenGL extension
-                    // for the specific offscreen buffer type is not supported. More 
-                    // likely this is a programming error in Resize(). 
-                    return false;
-                }
-                rebuild = true;
+        else if (tx != 0 && ty != 0 &&
+                    (   mOffscreenBuffer->GetWidth() != sizeX.getMax()
+                     || mOffscreenBuffer->GetHeight() != sizeY.getMax()
+                )   )
+        {
+            if (!mOffscreenBuffer->Resize(sizeX.getMax(), sizeY.getMax())) {
+                // Resizing the offscreen buffer failed, maybe the OpenGL extension
+                // for the specific offscreen buffer type is not supported. More
+                // likely this is a programming error in Resize().
+                return false;
             }
+            rebuild = true;
         }
 
         if (rebuild) {
@@ -294,7 +306,7 @@ namespace OpenCSG {
         if (!mInOffscreenBuffer) {
             mOffscreenBuffer->BeginCapture();
             if (mOffscreenBuffer->haveSeparateContext()) {
-                glFrontFace(FaceOrientation);
+                glFrontFace(mFaceOrientation);
             }
 
             mInOffscreenBuffer = true;

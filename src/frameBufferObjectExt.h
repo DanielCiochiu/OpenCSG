@@ -39,6 +39,9 @@ namespace OpenCSG {
             FrameBufferObjectExt();
             virtual ~FrameBufferObjectExt();
 
+            /// Reads the currently bound FBO.
+            virtual bool ReadCurrent();
+
             /// Call this once before use. shareObjects and copyContext are
             /// ignored, since there are no separate contexts for frame
             /// buffer objects anyway.
@@ -88,6 +91,11 @@ namespace OpenCSG {
             int          oldFramebufferID;
 
             bool         initialized;
+
+        private:
+            FrameBufferObjectExt(const FrameBufferObjectExt&);
+            FrameBufferObjectExt& operator=(const FrameBufferObjectExt&);
+
         };
 
     } // namespace OpenGL

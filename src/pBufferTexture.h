@@ -42,6 +42,9 @@ namespace OpenCSG {
             PBufferTexture();
             virtual ~PBufferTexture();
 
+            /// Nothing to do here.
+            virtual bool ReadCurrent();
+
             /// Call this once before use.  Set bShare to true to share lists, textures, 
             /// and program objects between the render texture context and the 
             /// current active GL context.
@@ -83,6 +86,11 @@ namespace OpenCSG {
         protected:
             RenderTexture* r;
             const char*    s;
+
+        private:
+            PBufferTexture(const PBufferTexture&);
+            PBufferTexture& operator=(const PBufferTexture&);
+
         };
 
     } // namespace OpenGL
